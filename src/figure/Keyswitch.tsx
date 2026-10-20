@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SVG, mountKeyswitch, actuationAt, forceAt } from './switchModel';
 import type { Reading } from './switchModel';
 import { SWITCHES } from '../content';
+import { playSwitch } from './switchSound';
 import type { SwitchSpec } from '../content';
 import '../iso/iso.css';
 import './keyswitch.css';
@@ -21,6 +22,8 @@ export function Keyswitch({ sw, pick }: { sw: Id; pick: (id: Id) => void }) {
   const handle = useRef<ReturnType<typeof mountKeyswitch> | null>(null);
   const readout = useRef<HTMLSpanElement>(null);
   const [shown, setShown] = useState({ g: 30, on: false });
+  const swRef = useRef(sw);
+  swRef.current = sw;
 
   useEffect(() => {
     const el = stage.current;
@@ -34,7 +37,24 @@ export function Keyswitch({ sw, pick }: { sw: Id; pick: (id: Id) => void }) {
       setShown((s) => (s.g === g && s.on === r.on ? s : { g, on: r.on }));
     });
     handle.current = h;
+
+    // sound on YOUR press only — the idle tour that presses itself stays silent
+    const ac = new AbortController();
+    const o = { signal: ac.signal };
+    let down = false;
+    const hit = (d: boolean) => {
+      if (d === down) return;
+      down = d;
+      playSwitch(swRef.current, d);
+    };
+    el.addEventListener('pointerdown', () => hit(true), o);
+    addEventListener('pointerup', () => hit(false), o);
+    addEventListener('pointercancel', () => hit(false), o);
+    el.addEventListener('keydown', (e) => (e.key === ' ' || e.key === 'Enter') && hit(true), o);
+    el.addEventListener('keyup', (e) => (e.key === ' ' || e.key === 'Enter') && hit(false), o);
+
     return () => {
+      ac.abort();
       h.dispose();
       handle.current = null;
     };

@@ -89,8 +89,11 @@ const S = k.solidSvg;
 const L = k.lineSvg;
 const D = k.dotsSvg;
 const slab = (plan: Plan, z: number, h: number, bevel = 0.4, steps = 4) => k.slabOf(plan, z, h, P, steps, bevel);
-const byDepth = <T extends { cx: number; cy: number }>(list: T[]) =>
-  [...list].sort((p, q) => k.depthOf([p.cx, p.cy, 0], P) - k.depthOf([q.cx, q.cy, 0], P));
+// Painter's order for a grid of boxes seen from +x/+y: back row first, then
+// along the row. Sorting by centre depth put the spacebar (centre far back on
+// a 6.25u cap) under its neighbours.
+const byDepth = <T extends { cx: number; row: number }>(list: T[]) =>
+  [...list].sort((p, q) => p.row - q.row || p.cx - q.cx);
 const square = (cx: number, cy: number, half: number, r: number): Plan => ({ x: cx - half, y: cy - half, w: half * 2, d: half * 2, r });
 const capPlan = (key: Key): Plan => ({ x: key.cx - (key.w * U) / 2 + 0.9, y: key.cy - U / 2 + 0.9, w: key.w * U - 1.8, d: U - 1.8, r: 2.2 });
 
