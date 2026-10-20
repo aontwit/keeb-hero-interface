@@ -30,8 +30,12 @@ Press **D** for the lil-gui art-direction panel.
 
 ## The model
 
-`public/assets/keyboard_75.glb` — 469 KB uncompressed, 53,244 triangles,
-84 keys, 14 animated parts.
+`public/assets/keyboard_75.glb` — 753 KB uncompressed (180 KB Draco),
+64,066 triangles, 91 meshes, 13 animated parts. Each of the 84 keycaps is its
+own object, parented to a row Empty — that is what makes a click press one key
+and lets the exploded view fan the keys apart individually. The brass plate carries a real
+14 mm cutout under every key — a solid slab was the loudest fake tell in the
+exploded view.
 
 Regenerate it from `build_keyboard_75.py` (Blender 4.x/5.x):
 
@@ -49,8 +53,11 @@ you add to the lighting rig must be in centimetres.
 Compress before shipping:
 
 ```bash
-npx @gltf-transform/cli optimize public/assets/keyboard_75.glb out.glb --compress draco
+npx @gltf-transform/cli draco public/assets/keyboard_75.glb out.glb
 ```
+
+`optimize` also joins meshes, which merges the named nodes the loader resolves
+parts by. `draco` alone compresses 753 KB -> 180 KB and leaves the graph intact.
 
 `loader.js` already installs a `DRACOLoader`, so a compressed file drops in with
 no code change.
@@ -65,7 +72,8 @@ no code change.
 | `KB_Switches_Group` | empty parenting 84 linked-duplicate switches |
 | `KB_Case_Top` | high-profile frame/bezel |
 | `KB_SideControls` | USB-C recess + 2 slide nubs, left edge |
-| `KB_Keycaps_Row0..Row5` | Row0 = F-row, Row5 = bottom row |
+| `KB_Keycaps_Row0..Row5` | Empty per row; Row0 = F-row, Row5 = bottom row |
+| `KB_Key_R{row}_{nn}` | one object per keycap, parented to its row |
 | `KB_Cable_USB` | optional stub, left side |
 
 `loader.js` resolves each name **exactly first, then by prefix**, and reports
@@ -91,6 +99,10 @@ src/three/loader.ts       GLTF + Draco, part resolution, scene-graph report
 src/three/scrollExplode.ts per-part state, exploded transforms, staged scrub
 src/three/timelineAssemble.ts anime.js intro timeline
 src/three/interactions.ts pointer parallax, idle sway, click-to-press
+src/three/materials.ts    PBR pass: clearcoat, sheen, transmission, brass
+src/three/switches.ts     blue/red/brown — one stem colour + one easing
+src/three/heroSwitches.ts the three switches that climb out for the picker
+src/three/callouts.ts     SVG leader lines into a fixed label column
 src/three/debug.ts        lil-gui panel (D)
 src/three/engine.ts       wiring, render loop, dispose
 ```
@@ -106,6 +118,14 @@ avoid.
 0 = exploded). The intro timeline and the scroll scrub both write `t`; a single
 `applyStates()` lerps position and rotation once per frame. Two systems can
 never fight over the same `position.y`, and nothing is allocated per frame.
+
+**Labels live in slots, not next to their parts.** `callouts.ts` projects an
+anchor point on each part to screen every frame, but the label end of the line
+is pinned to a fixed column in the top-left. A slot cannot collide with another
+label, land on the body copy, or leave the frame, so the anchors only have to
+sit on the part — no per-part label placement to re-tune when the explode
+changes. Which set is up comes from an IntersectionObserver over the sections
+that declare `data-parts`.
 
 Idle sway, float and pointer parallax live on a wrapper `rig`, so they compose
 with part motion instead of overwriting it.
@@ -153,11 +173,12 @@ animation graph writing the same property is the exact fight the single-writer
 design avoids, and the brief allows the lerp as the alternative. `scrollOrbit`
 in the debug panel drives the camera sweep off the same progress value.
 
-**Click presses a keycap ROW, not one key.** The `.glb` merges each row's caps
-into one object, so a row is the smallest pressable unit. For true per-key
-press, export caps individually — in `build_keyboard_75.py`, give each cap its
-own object instead of joining per row, then key off a raycast hit. That trades
-6 draw calls for 84.
+**Per-key press costs draw calls.** Splitting the caps into 84 objects took the
+scene from 23 meshes / 15 shadow casters to 104 / 87 — roughly 190 draw calls a
+frame, still a third of the 540 the switch merge was written to fix, and it
+holds 60 fps on desktop. If it ever bites, the next step is merging the caps
+back per row and moving one key's vertices through `addUpdateRange`, which keeps
+6 draw calls at the cost of real complexity.
 
 **Rows are 16.00u, not 15.75u.** 15.75u does not tile with standard keycap
 widths. `KEY_UNIT` is scaled to 1.875 cm instead, so total width still lands on

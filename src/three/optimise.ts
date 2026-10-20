@@ -14,6 +14,23 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  */
 
 /**
+ * One switch, lifted out before the merge destroys the instances.
+ *
+ * Every instance points at the same three primitives, so the clone shares
+ * geometry with the board and costs nothing but a few nodes. Transform is
+ * cleared: the caller places it.
+ */
+export function switchTemplate(group: THREE.Object3D): THREE.Object3D | null {
+  const first = group.children.find((c) => c.name.startsWith('KB_Switch_'));
+  if (!first) return null;
+  const clone = first.clone();
+  clone.position.set(0, 0, 0);
+  clone.rotation.set(0, 0, 0);
+  clone.scale.set(1, 1, 1);
+  return clone;
+}
+
+/**
  * Merge the 84 switch instances into one mesh per material.
  *
  * 252 draw calls -> 3. Geometry is baked into group-local space, so the group

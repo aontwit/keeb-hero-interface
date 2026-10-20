@@ -69,6 +69,24 @@ export interface PartState {
   awayRot: THREE.Euler;
   /** Click micro-interaction, cm of downward travel. */
   press: number;
+  /** Keycap rows are Empties with one object per key — see KeyState. */
+  keys: KeyState[];
+}
+
+/**
+ * One keycap.
+ *
+ * The .glb carries 84 individual key objects parented to six row Empties, so
+ * the smallest thing that can move is a key, not a row. Same contract as
+ * PartState: the row's `t` drives `away`, a click drives `press`, and
+ * applyStates is still the only writer.
+ */
+export interface KeyState {
+  node: THREE.Object3D;
+  home: THREE.Vector3;
+  /** Where this key drifts to at full explode, relative to its row. */
+  away: THREE.Vector3;
+  press: number;
 }
 
 /** Camera rig, mutated in place by the loop and by the debug panel. */

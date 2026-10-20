@@ -70,7 +70,7 @@ export function createDebug(
   fIdle.add(interactions.cfg, 'floatAmp', 0, 2, 0.01).name('float (cm)');
   fIdle.add(interactions.cfg, 'parallax').name('pointer parallax');
   fIdle.add(interactions.cfg, 'tiltY', 0, 0.5, 0.005).name('tilt amount');
-  fIdle.add({ press: () => interactions.press() }, 'press').name('▶ press a row');
+  fIdle.add({ press: () => interactions.press() }, 'press').name('▶ press a key');
 
   const fLook = gui.addFolder('look');
   fLook.add(scene, 'environmentIntensity', 0, 2, 0.01).name('env intensity');

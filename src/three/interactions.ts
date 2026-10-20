@@ -1,7 +1,8 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { animate, utils } from 'animejs';
 import { IS_MOBILE } from './scene';
-import type { PartState } from './types';
+import { allKeys } from './scrollExplode';
+import type { KeyState, PartState } from './types';
 
 export interface InteractionConfig {
   parallax: boolean;
@@ -23,10 +24,15 @@ export interface InteractionConfig {
    * nauseating, and WCAG 2.3.3 lets interaction-triggered motion be reduced.
    */
   reduced: boolean;
+  /** Bottom-out easing — the switch swap writes the selected type's feel here. */
+  pressEase: string;
+  /** cm of cap travel on a press. */
+  pressDrop: number;
 }
 
 export interface Interactions {
   cfg: InteractionConfig;
+  /** Press one key at random — the debug panel and the switch picker use it. */
   press(): void;
   update(dt: number): void;
 }
@@ -39,6 +45,7 @@ export interface Interactions {
  */
 export function createInteractions(
   rig: THREE.Object3D,
+  camera: THREE.PerspectiveCamera,
   states: PartState[],
   signal: AbortSignal,
   { enableParallax = !IS_MOBILE }: { enableParallax?: boolean } = {},
@@ -60,6 +67,8 @@ export function createInteractions(
     floatSpeed: 0.5,
     idle: true,
     reduced: false, // engine sets this from the media query, and on change
+    pressEase: 'outElastic(1, .55)',
+    pressDrop: 0.34,
   };
 
   let targetX = 0;
@@ -81,34 +90,53 @@ export function createInteractions(
     }, { signal });
   }
 
-  // ── click: press a keycap row and pop it back ──────────────────────
-  // The .glb merges each row's caps into a single object, so the smallest
-  // pressable unit is a row, not a key. Per-key press needs the caps exported
-  // as individual objects — see the README.
-  const rows = states.filter((s) => /^KB_Keycaps_Row\d$/.test(s.name));
-  let pressing: PartState | null = null;
+  // ── click: press the key under the pointer ─────────────────────────
+  // The .glb carries one object per key, so the raycast can name the exact cap
+  // that was clicked. Before that split a click pressed all fifteen caps in a
+  // row, because a row was one merged mesh.
+  const keys = allKeys(states);
+  const meshes = keys.map((k) => k.node);
+  const byNode = new Map(keys.map((k) => [k.node, k]));
+  const pressing = new Set<KeyState>();
 
-  const press = () => {
-    if (!rows.length) return;
-    const s = rows[Math.floor(utils.random(0, rows.length))] ?? rows[0];
-    if (pressing === s) return;
-    pressing = s;
-    animate(s, {
+  const pressKey = (k: KeyState) => {
+    if (pressing.has(k)) return; // already on its way down
+    pressing.add(k);
+    animate(k, {
       press: cfg.reduced
         ? [
-            { to: 0.34, duration: 60, ease: 'outQuad' },
+            { to: cfg.pressDrop, duration: 60, ease: 'outQuad' },
             { to: 0, duration: 130, ease: 'outQuad' },
           ]
         : [
-            { to: 0.34, duration: 70, ease: 'outQuad' },
-            { to: 0, duration: 420, ease: 'outElastic(1, .55)' },
+            { to: cfg.pressDrop, duration: 70, ease: 'outQuad' },
+            // per switch type: blue snaps back off the click, red glides
+            { to: 0, duration: 420, ease: cfg.pressEase },
           ],
-      onComplete: () => {
-        if (pressing === s) pressing = null;
-      },
+      onComplete: () => pressing.delete(k),
     });
   };
-  addEventListener('pointerdown', press, { signal });
+
+  const press = () => {
+    if (keys.length) pressKey(keys[Math.floor(utils.random(0, keys.length))] ?? keys[0]);
+  };
+
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+
+  addEventListener(
+    'pointerdown',
+    (e: PointerEvent) => {
+      // A miss presses nothing: clicking the copy or the background should not
+      // fire a key somewhere off screen.
+      ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      const hit = ray.intersectObjects(meshes, false)[0];
+      const k = hit && byNode.get(hit.object);
+      if (k) pressKey(k);
+    },
+    { signal },
+  );
 
   let elapsed = 0;
   return {

@@ -36,7 +36,9 @@ export function createScene(canvas: HTMLCanvasElement, signal: AbortSignal): Sce
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
   scene.environment = envRT.texture;
-  scene.environmentIntensity = 0.55;
+  // Raised with the material pass: clearcoat and brass both read off the
+  // environment, and at 0.55 the second lobe had nothing to catch.
+  scene.environmentIntensity = 0.68;
 
   const camera = new THREE.PerspectiveCamera(32, 1, 1, 400);
 

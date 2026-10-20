@@ -5,7 +5,12 @@ import { createStates, applyStates, createScrollExplode } from './scrollExplode'
 import { createAssembleTimeline } from './timelineAssemble';
 import { createInteractions } from './interactions';
 import { createDebug } from './debug';
-import { mergeSwitches, pruneShadowCasters } from './optimise';
+import { mergeSwitches, pruneShadowCasters, switchTemplate } from './optimise';
+import { createHeroSwitches } from './heroSwitches';
+import { shadeModel } from './materials';
+import { createSwitchSwap } from './switches';
+import { createCallouts } from './callouts';
+import type { SwitchSwap } from './switches';
 import type { ScrollExplode } from './scrollExplode';
 import type { AssembleTimeline } from './timelineAssemble';
 import type { Interactions } from './interactions';
@@ -23,6 +28,8 @@ export interface Engine {
   model: LoadedModel;
   states: PartState[];
   orbit: Orbit;
+  /** blue / red / brown — React drives this from the switch section. */
+  switches: SwitchSwap;
   dispose(): void;
 }
 
@@ -80,9 +87,14 @@ export async function startEngine({
   const missing = missingParts(report);
   if (missing.length) console.warn('[keeb-hero] unresolved parts:', missing);
 
+  // Shading first: mergeSwitches buckets geometry by material identity, so the
+  // upgrade has to happen while every switch still points at the original.
+  const shaded = shadeModel(root);
+
   // Draw-call surgery before anything else touches the graph. Measured on the
   // deployed build: 272 meshes / 271 shadow casters ≈ 540 draw calls a frame.
   const switchGroup = parts.KB_Switches_Group;
+  const template = switchGroup ? switchTemplate(switchGroup) : null; // before the merge eats them
   const merged = switchGroup ? mergeSwitches(switchGroup) : { before: 0, after: 0 };
   const { casters } = pruneShadowCasters(root);
 
@@ -100,7 +112,19 @@ export async function startEngine({
   const states = createStates(parts);
   const scroll = createScrollExplode(states, signal, stages ? { stages } : {});
   const assemble = createAssembleTimeline(states);
-  const interactions = createInteractions(rig, states, signal);
+  const interactions = createInteractions(rig, camera, states, signal);
+
+  // Added to `root` AFTER the camera fit, on purpose: they park well above the
+  // board and would otherwise pull the framing out to include empty air.
+  const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  const heroes = createHeroSwitches(IS_MOBILE ? null : template, root, motionQuery.matches);
+  const callouts = createCallouts(camera, { ...parts, ...heroes.nodes }, signal, (keys) =>
+    heroes.show(keys.some((k) => k.startsWith('HERO_'))),
+  );
+  const switches = createSwitchSwap(root, interactions, (spec) => {
+    callouts.setNote('KB_Switches_Group', `84 · ${spec.feel.toLowerCase()}`);
+    heroes.select(spec.id);
+  });
 
   const orbit: Orbit = {
     yaw: -0.42,
@@ -120,8 +144,6 @@ export async function startEngine({
   // camera sweep, and the damping tail that keeps the board drifting after
   // scrolling stops. Kept: the explode itself, because it is the content and
   // it is 1:1 with the scroll position — direct manipulation, not autoplay.
-  const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
-
   const applyMotionPreference = (reduced: boolean) => {
     interactions.cfg.reduced = reduced;
     interactions.cfg.idle = !reduced;
@@ -154,6 +176,7 @@ export async function startEngine({
     // the intro owns `t` until it finishes; after that scroll takes over
     const p = scroll.update(dt, assemble.running || debug.manual.override);
     interactions.update(dt);
+    heroes.update(dt);
     applyStates(states);
 
     const yaw = orbit.yaw + p * orbit.scrollOrbit;
@@ -183,6 +206,8 @@ export async function startEngine({
       document.documentElement.style.setProperty('--p', String(p3));
     }
     composer.render();
+    // after render, so the world matrices the projection reads are this frame's
+    callouts.update();
   });
 
   // skip the intro on first scroll — nobody should have to wait for it
@@ -200,10 +225,12 @@ export async function startEngine({
     model,
     states,
     orbit,
+    switches,
     dispose() {
       ac.abort();
       renderer.setAnimationLoop(null);
       assemble.dispose();
+      callouts.dispose();
       debug.dispose();
       scene.remove(rig);
       root.traverse((o) => {
@@ -244,6 +271,7 @@ export async function startEngine({
     `${stats.triangles.toLocaleString()} tris,`,
     `${states.length} parts,`,
     `switches ${merged.before}->${merged.after} meshes,`,
+    `${shaded.shaded} materials shaded${shaded.unknown.length ? ` (unshaded: ${shaded.unknown.join(', ')})` : ''},`,
     `${drawn} meshes / ${casters} shadow casters,`,
     `mobile: ${IS_MOBILE}`,
   );

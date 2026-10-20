@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { utils } from 'animejs';
 import { EXPECTED_PARTS } from './types';
-import type { PartName, PartState, Parts } from './types';
+import type { KeyState, PartName, PartState, Parts } from './types';
 
 /** How far each part travels when fully exploded (cm), plus a little spin. */
 type Move = { move: [number, number, number]; spin: [number, number, number] };
@@ -18,6 +18,14 @@ const EXPLODE: Partial<Record<PartName, Move>> = {
 };
 
 const ROW_LIFT = [30, 26.5, 23, 19.5, 16, 12.5]; // Row0 (F-row) highest
+
+/**
+ * How far the keys within a row drift apart, as a fraction of their own
+ * distance from the middle of the board. A grid that expands about its own
+ * centre stays readable as a keyboard while every key gets its own gap —
+ * a flat per-key offset just shears the row sideways.
+ */
+const KEY_SPREAD = 0.3;
 
 export function createStates(parts: Parts): PartState[] {
   const rand = utils.createSeededRandom(20260722); // stable across reloads
@@ -38,6 +46,25 @@ export function createStates(parts: Parts): PartState[] {
     const jr = (rand() - 0.5) * 0.13;
     const jp = (rand() - 0.5) * 0.1;
 
+    // 84 key objects across six rows, and only there: every other part's
+    // children are material-split primitives, which must keep moving with the
+    // part they belong to.
+    const keys: KeyState[] = !row
+      ? []
+      : node.children.map((child) => {
+          const home = child.position.clone();
+          return {
+            node: child,
+            home,
+            away: new THREE.Vector3(
+              home.x * KEY_SPREAD + (rand() - 0.5) * 1.2,
+              (rand() - 0.5) * 1.4,
+              home.z * KEY_SPREAD + (rand() - 0.5) * 1.2,
+            ),
+            press: 0,
+          };
+        });
+
     states.push({
       name,
       node,
@@ -47,9 +74,15 @@ export function createStates(parts: Parts): PartState[] {
       away: new THREE.Vector3(move[0] + jx, move[1], move[2] + jz),
       awayRot: new THREE.Euler(spin[0] + jp, spin[1] + jr, spin[2]),
       press: 0,
+      keys,
     });
   }
   return states;
+}
+
+/** Every key in the model, flattened — what the click raycast tests against. */
+export function allKeys(states: PartState[]): KeyState[] {
+  return states.flatMap((s) => s.keys);
 }
 
 /** Single writer for every part transform. Allocates nothing per frame. */
@@ -67,6 +100,15 @@ export function applyStates(states: PartState[]): void {
       s.homeRot.y + s.awayRot.y * k,
       s.homeRot.z + s.awayRot.z * k,
     );
+    // keys ride their row, then drift apart inside it
+    for (let j = 0; j < s.keys.length; j++) {
+      const key = s.keys[j];
+      key.node.position.set(
+        key.home.x + key.away.x * k,
+        key.home.y + key.away.y * k - key.press,
+        key.home.z + key.away.z * k,
+      );
+    }
   }
 }
 
