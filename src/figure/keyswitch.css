@@ -1,0 +1,174 @@
+/* Fig 5. Kit tokens come from iso.css; this file only places the plate on the page. */
+.anatomy {
+  --kf-red: #e5484d;
+  --kf-blue: #4aa8e8;
+  --kf-brown: #b9875c;
+  --kf-stem: var(--kf-red);
+  --anatomy-page: #0d0f14;
+  position: relative;
+  z-index: 3;
+  min-height: auto;
+  display: block;
+  padding: clamp(5rem, 12vh, 9rem) clamp(1rem, 6vw, 5rem) clamp(4rem, 10vh, 7rem);
+  background: var(--anatomy-page);
+  color: var(--anatomy-text);
+  pointer-events: auto; /* main is pointer-events:none for the canvas */
+  border-top: 1px solid #ffffff12;
+}
+
+.an-head {
+  max-width: 44rem;
+}
+.an-no,
+.an-label {
+  font-family: var(--anatomy-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--anatomy-muted);
+}
+.an-head h2 {
+  margin-top: 0.6rem;
+  font: 400 clamp(2.6rem, 6vw, 4.6rem) / 0.95 var(--serif);
+  letter-spacing: -0.01em;
+  color: var(--anatomy-strong);
+}
+.an-head h2 em {
+  display: block;
+  font-style: italic;
+  color: var(--anatomy-muted);
+}
+.an-head p {
+  margin-top: 1.2rem;
+  max-width: 46ch;
+  color: var(--anatomy-text);
+}
+
+.an-grid {
+  margin-top: 2.4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .an-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.anatomy .iso-figure {
+  margin: 0;
+}
+.anatomy .iso-stage {
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+.anatomy .iso-stage:focus-visible {
+  box-shadow: 0 0 0 1px var(--anatomy-hi);
+}
+.kf-svg .kf-stem,
+.kf-svg [data-part='curve'] {
+  --anatomy-lit: var(--kf-stem);
+}
+.kf-svg [data-part='curve'] {
+  stroke-width: 1.1;
+}
+.kf-svg .kf-dot {
+  fill: var(--anatomy-strong);
+}
+.kf-svg [data-part='trace'] {
+  transition: stroke 120ms;
+}
+.kf-svg [data-part='trace'][data-tone='lit'] {
+  stroke: #ffb35c;
+}
+
+/* ── the live number, Anatomy-promo style ───────────── */
+.an-read {
+  position: sticky;
+  top: 6rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.an-big {
+  font: 400 clamp(4.5rem, 9vw, 6.5rem) / 0.9 var(--serif);
+  color: var(--anatomy-strong);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.an-big i {
+  margin-left: 0.15em;
+  font-size: 0.42em;
+  color: var(--anatomy-muted);
+}
+.an-meter {
+  height: 3px;
+  background: linear-gradient(to right, var(--anatomy-strong) calc(var(--v) * 100%), var(--anatomy-faint) 0);
+}
+.an-state {
+  font-family: var(--anatomy-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--anatomy-muted);
+}
+.an-state[data-on] {
+  color: #ffb35c;
+}
+.an-stems {
+  margin-top: 1.6rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.an-stems button {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  background: var(--anatomy-card);
+  box-shadow: 0 0 0 1px var(--anatomy-faint);
+  color: var(--anatomy-text);
+  font: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.2s var(--anatomy-ease), color 0.2s;
+}
+.an-stems button b {
+  font: 400 1.35rem/1 var(--serif);
+  color: var(--anatomy-strong);
+}
+.an-stems button b::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 0.55rem;
+  vertical-align: 0.2em;
+  background: var(--c);
+}
+.an-stems button span {
+  font-family: var(--anatomy-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.an-stems button:hover {
+  box-shadow: 0 0 0 1px var(--anatomy-mid);
+}
+.an-stems button[aria-checked='true'] {
+  box-shadow: 0 0 0 1px var(--anatomy-hi);
+  color: var(--anatomy-strong);
+}
+.an-stems button:focus-visible {
+  outline: 1px solid var(--anatomy-lit);
+  outline-offset: 2px;
+}
+.an-read p {
+  margin-top: 1rem;
+  font-size: 14px;
+  color: var(--anatomy-text);
+}

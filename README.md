@@ -28,6 +28,23 @@ Press **D** for the lil-gui art-direction panel.
 
 ---
 
+## Fig 5 — the keyswitch figure
+
+Below the scroll story sits an interactive isometric figure: one switch on a
+force bench, top housing cut away. Hold it down and the stem travels 4 mm, the
+spring compresses, the leaf contacts close at the actuation point, the PCB trace
+lights the LED, the dial needle and the chart on the side panel read the force.
+Blue / Red / Brown swap the force curve (and the 3D board's stems).
+
+Every number comes from one model, `forceAt(stem, mm)` in
+`src/figure/switchModel.ts`: 30 g preload + 7.5 g/mm, a tactile bump for
+brown and blue, a hard stop past 3.8 mm.
+
+Drawn with the [Anatomy](https://github.com/wheresryan22/anatomy) iso kit by
+@wheresryan22 (MIT) — vendored in `src/iso/` with its licence.
+
+---
+
 ## The model
 
 `public/assets/keyboard_75.glb` — 753 KB uncompressed (180 KB Draco),

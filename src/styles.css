@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;800;900&family=Instrument+Serif:ital@0;1&display=swap');
 
 :root {
   color-scheme: dark;
@@ -6,6 +6,7 @@
   --ink: #edeae3;
   --dim: #7c8290;
   --hot: #e8500f;
+  --serif: 'Instrument Serif', 'Times New Roman', serif;
 }
 * {
   margin: 0;
@@ -78,11 +79,8 @@ section {
   padding: 0 clamp(1.2rem, 6vw, 5rem);
 }
 .hero h1 {
-  font-weight: 900;
-  letter-spacing: -0.055em;
-  line-height: 0.84;
-  font-size: clamp(3.4rem, 9.5vw, 8.5rem);
-  text-transform: uppercase;
+  font: 400 clamp(3.6rem, 9vw, 8rem) / 0.9 var(--serif);
+  letter-spacing: -0.02em;
 }
 /* keep the copy in the left column — the board is panned into the right */
 .hero > * {
@@ -94,7 +92,7 @@ section {
   }
 }
 .hero h1 em {
-  font-style: normal;
+  font-style: italic;
   color: var(--hot);
 }
 .hero .sub {
@@ -113,13 +111,18 @@ section {
   text-transform: uppercase;
   color: var(--dim);
 }
+.hero .meta {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
 .hero .meta b {
   display: block;
+  margin-top: 0.2rem;
   color: var(--ink);
-  font-size: 1.5rem;
-  letter-spacing: -0.02em;
+  font: 400 2.4rem/1 var(--serif);
+  letter-spacing: 0;
   text-transform: none;
-  font-weight: 800;
 }
 
 .layer {
@@ -129,17 +132,18 @@ section {
   margin-left: auto;
   text-align: right;
 }
-.layer .idx {
-  font-size: 12px;
-  letter-spacing: 0.24em;
+.layer .idx,
+.picker .idx {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
   color: var(--hot);
-  font-weight: 500;
 }
-.layer h2 {
-  margin-top: 0.5rem;
-  font-weight: 900;
-  letter-spacing: -0.035em;
-  font-size: clamp(1.8rem, 4.5vw, 3.4rem);
+.layer h2,
+.picker h2 {
+  margin-top: 0.4rem;
+  font: 400 clamp(2.4rem, 5.5vw, 4.2rem) / 0.95 var(--serif);
+  letter-spacing: -0.01em;
 }
 .layer p {
   margin-top: 0.8rem;
@@ -153,18 +157,6 @@ section {
 /* ── switch picker ───────────────────────────────────── */
 .picker {
   max-width: 34rem;
-}
-.picker .idx {
-  font-size: 12px;
-  letter-spacing: 0.24em;
-  color: var(--hot);
-  font-weight: 500;
-}
-.picker h2 {
-  margin-top: 0.5rem;
-  font-weight: 900;
-  letter-spacing: -0.035em;
-  font-size: clamp(1.8rem, 4.5vw, 3.4rem);
 }
 .swatches {
   display: flex;
@@ -218,9 +210,7 @@ section {
   margin-bottom: 0.45rem;
 }
 .swatches b {
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  font-size: 15px;
+  font: 400 1.35rem/1 var(--serif);
 }
 .swatches span {
   font-size: 11px;
@@ -246,9 +236,7 @@ section {
 }
 .picker dd {
   margin: 0.25rem 0 0;
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font: 400 1.5rem/1 var(--serif);
 }
 
 /* ── leader lines ────────────────────────────────────── */

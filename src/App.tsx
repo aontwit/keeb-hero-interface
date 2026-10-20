@@ -3,6 +3,7 @@ import { startEngine } from './three/engine';
 import type { Engine } from './three/engine';
 import { LAYERS, SWITCHES } from './content';
 import type { SwitchSpec } from './content';
+import { Keyswitch } from './figure/Keyswitch';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
@@ -82,6 +83,9 @@ export default function App() {
             <a href="#specs">Specs</a>
           </li>
           <li>
+            <a href="#anatomy">Anatomy</a>
+          </li>
+          <li>
             <a href="#">Buy</a>
           </li>
         </ul>
@@ -134,6 +138,8 @@ export default function App() {
           </h1>
           <p className="sub">Scroll up and it reassembles. Click any key to press it.</p>
         </section>
+
+        <Keyswitch sw={sw} pick={pick} />
       </main>
 
       <div className="bar" />

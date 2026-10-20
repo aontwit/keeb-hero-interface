@@ -190,7 +190,8 @@ export function createCallouts(
         if (!l.shown) continue;
         l.node.localToWorld(v.copy(l.at));
         v.project(camera);
-        if (v.z > 1) {
+        // a parked hero switch is scaled to 0 — its matrix projects to NaN
+        if (v.z > 1 || !Number.isFinite(v.x) || !Number.isFinite(v.y)) {
           l.g.style.visibility = 'hidden';
           continue;
         }
