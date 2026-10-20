@@ -1,77 +1,121 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { startEngine } from './three/engine';
-import type { Engine } from './three/engine';
 import { LAYERS, SWITCHES } from './content';
 import type { SwitchSpec } from './content';
 import { Keyswitch } from './figure/Keyswitch';
+import { SVG as BOARD_SVG, mountBoard } from './figure/boardModel';
+import type { Board, LayerId } from './figure/boardModel';
+import { playSwitch } from './figure/switchSound';
+import './iso/iso.css';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const label = (code: string) => code.replace(/^(Key|Digit)/, '').toLowerCase();
 
 /**
- * React owns the DOM shell. It does NOT own anything that changes per frame —
- * the scroll progress bar reads a CSS custom property the render loop writes,
- * and every Object3D transform is mutated directly. Two pieces of state exist,
- * and each flips at most once: `ready` and `error`.
+ * React owns the DOM shell. Fig 1 is an SVG string injected once; scroll,
+ * presses and focus write straight onto it. React state is only the selected
+ * switch.
  */
 export default function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<Engine | null>(null);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // the only per-interaction state React owns: which switch is selected. The
-  // colour tween itself runs in three.js, not in a re-render.
+  const stageRef = useRef<HTMLDivElement>(null);
+  const readoutRef = useRef<HTMLSpanElement>(null);
+  const boardRef = useRef<Board | null>(null);
   const [sw, setSw] = useState<SwitchSpec['id']>(SWITCHES[0].id);
+  const swRef = useRef(sw);
+  swRef.current = sw;
 
+  // ── Fig 1: mount, scroll → explode, keys → presses + sound ─────────
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    // React never owns these children: the live code writes straight onto them
+    stage.innerHTML = BOARD_SVG;
+    const say = (text: string) => {
+      if (readoutRef.current) readoutRef.current.textContent = text;
+    };
+    const board = mountBoard(stage, (down, code) => {
+      playSwitch(swRef.current, down);
+      if (down) say(`${swRef.current} · ${label(code)}`);
+    });
+    board.setStem(hex(SWITCHES[0].hex));
+    boardRef.current = board;
 
-    let engine: Engine | null = null;
-    let cancelled = false;
+    // apart while the layer sections scroll by; back together on the last hero
+    const ac = new AbortController();
+    const onScroll = () => {
+      const vh = innerHeight;
+      const open = clamp01(scrollY / (vh * 0.8));
+      const end = document.querySelector('[data-reassemble]')?.getBoundingClientRect().top ?? Infinity;
+      board.setExplode(Math.min(open, clamp01(end / (vh * 0.8))));
+      const max = document.documentElement.scrollHeight - vh;
+      document.documentElement.style.setProperty('--p', String(max > 0 ? clamp01(scrollY / max) : 0));
+    };
+    addEventListener('scroll', onScroll, { passive: true, signal: ac.signal });
+    onScroll();
 
-    startEngine({
-      canvas,
-      stages: LAYERS.length + 1, // one scroll hold per layer section, plus the picker
-      onReady: () => !cancelled && setReady(true),
-    })
-      .then((e) => {
-        // StrictMode runs the effect twice; if cleanup already fired while the
-        // .glb was loading, tear the second engine down immediately.
-        if (cancelled) e.dispose();
-        else {
-          engine = e;
-          engineRef.current = e;
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled || (err as Error)?.name === 'AbortError') return;
-        console.error('[keeb-hero]', err);
-        setError(err instanceof Error ? err.message : String(err));
-      });
+    // type on your own keyboard once the drawing has focus
+    const key = (down: boolean) => (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey) return;
+      if (board.press(e.code, down) && e.code !== 'Tab') e.preventDefault();
+    };
+    stage.addEventListener('keydown', key(true), { signal: ac.signal });
+    stage.addEventListener('keyup', key(false), { signal: ac.signal });
+    // focus so typing works, without the keyboard focus ring a mouse user never asked for
+    stage.addEventListener('pointerdown', () => stage.focus({ focusVisible: false } as FocusOptions), {
+      signal: ac.signal,
+    });
 
     return () => {
-      cancelled = true;
-      engine?.dispose();
-      engine = null;
-      engineRef.current = null;
+      ac.abort();
+      board.dispose();
+      boardRef.current = null;
     };
+  }, []);
+
+  // The section mid-screen names itself in the plate's readout and brings its
+  // layer forward. Written straight to the DOM — not worth a re-render.
+  useEffect(() => {
+    const out = readoutRef.current;
+    if (!out) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const el = e.target as HTMLElement;
+          out.textContent = el.dataset.readout ?? '';
+          boardRef.current?.setFocus((el.dataset.layer as LayerId | undefined) ?? null);
+        }
+      },
+      { rootMargin: '-50% 0px -50% 0px' },
+    );
+    document.querySelectorAll('[data-readout]').forEach((el) => io.observe(el));
+    return () => io.disconnect();
   }, []);
 
   const spec = SWITCHES.find((s) => s.id === sw)!;
   const pick = (id: SwitchSpec['id']) => {
     setSw(id);
-    engineRef.current?.switches.select(id);
+    boardRef.current?.setStem(hex(SWITCHES.find((s) => s.id === id)!.hex));
   };
 
   return (
-    <>
-      <canvas id="app" ref={canvasRef} />
-
-      {!ready && (
-        <div className="boot" {...(error ? { 'data-error': '' } : {})}>
-          {error ?? 'loading'}
-        </div>
-      )}
+    <div className="iso page">
+      {/* Fig 1: same plate, same corner labels, same iso kit as Fig 5 */}
+      <div className="plate">
+        <span data-corner="fig">Fig 1</span>
+        <span data-corner="title">Seventy-five · exploded</span>
+        <span data-corner="hint">Click, then type</span>
+        <span data-corner="readout" ref={readoutRef}>
+          assembled · 84 keys
+        </span>
+        <div
+          ref={stageRef}
+          className="kb-stage"
+          tabIndex={0}
+          role="application"
+          aria-label="Keyboard drawing. Click a key, or focus it and type, to press keys."
+        />
+      </div>
 
       <nav>
         <span className="mark">SEVENTY-FIVE</span>
@@ -89,11 +133,11 @@ export default function App() {
             <a href="#">Buy</a>
           </li>
         </ul>
-        <span style={{ opacity: 0.62 }}>press D</span>
       </nav>
 
       <main>
-        <section className="hero">
+        <section className="hero" data-readout="assembled · 84 keys">
+          <span className="no">No. 00</span>
           <h1>
             Eighty&#8209;four
             <br />
@@ -104,6 +148,25 @@ export default function App() {
           <p className="sub">
             A 75% high-profile board, taken apart and put back together while you scroll.
           </p>
+          {/* the first thing you can do: pick a stem and hear it */}
+          <div className="hero-stems" role="radiogroup" aria-label="Switch">
+            {SWITCHES.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                role="radio"
+                aria-checked={s.id === sw}
+                onClick={() => {
+                  pick(s.id);
+                  playSwitch(s.id, true);
+                  setTimeout(() => playSwitch(s.id, false), 90);
+                }}
+                style={{ ['--c' as string]: hex(s.hex) }}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
           <div className="meta">
             <span>
               Keys<b>84</b>
@@ -119,7 +182,12 @@ export default function App() {
 
         {LAYERS.map((l) => (
           <Fragment key={l.idx}>
-            <section className="layer" id={l.anchor} data-parts={l.parts?.join(',')}>
+            <section
+              className="layer"
+              id={l.anchor}
+              data-layer={l.layer}
+              data-readout={`${l.idx.toLowerCase()} · ${l.title.toLowerCase()}`}
+            >
               <span className="idx">{l.idx}</span>
               <h2>{l.title}</h2>
               <p>{l.body}</p>
@@ -130,7 +198,8 @@ export default function App() {
           </Fragment>
         ))}
 
-        <section className="hero">
+        <section className="hero" data-readout="reassembled · 84 keys" data-reassemble="">
+          <span className="no">No. 04</span>
           <h1>
             Back
             <br />
@@ -143,8 +212,7 @@ export default function App() {
       </main>
 
       <div className="bar" />
-      <div className="hint">scroll to disassemble</div>
-    </>
+    </div>
   );
 }
 
@@ -160,20 +228,29 @@ function SwitchPicker({
   // data-parts lists the highest switch first: callout slots fill top-down, and
   // matching that order to the diagonal keeps the leader lines from crossing
   return (
-    <section className="picker" id="switches" data-parts="HERO_brown,HERO_red,HERO_blue">
+    <section
+      className="picker"
+      id="switches"
+      data-layer="switches"
+      data-readout={`layer 05 · ${spec.name.toLowerCase()} stem`}
+    >
           <span className="idx">LAYER 05 — PICK ONE</span>
           <h2>Three stems.</h2>
-          <div className="swatches">
+          {/* same control as Fig 5's stem list, so the two pickers read as one */}
+          <div className="an-stems" role="radiogroup" aria-label="Stem">
             {SWITCHES.map((s) => (
               <button
                 key={s.id}
                 type="button"
-                aria-pressed={s.id === sw}
+                role="radio"
+                aria-checked={s.id === sw}
                 onClick={() => pick(s.id)}
+                style={{ ['--c' as string]: hex(s.hex) }}
               >
-                <i style={{ background: hex(s.hex) }} />
                 <b>{s.name}</b>
-                <span>{s.feel}</span>
+                <span>
+                  {s.feel} · {s.force}
+                </span>
               </button>
             ))}
           </div>

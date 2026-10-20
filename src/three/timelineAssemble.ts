@@ -83,7 +83,7 @@ function collectMaterials(states: PartState[]): TrackedMaterial[] {
   for (const s of states) {
     s.node.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
+      if (!mesh.isMesh && !(o as THREE.LineSegments).isLine) return;
       const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const raw of list) {
         const m = raw as TrackedMaterial;

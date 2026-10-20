@@ -1,62 +1,64 @@
 import * as THREE from 'three';
-import { IS_MOBILE } from './scene';
 
 /**
- * Shading pass over the .glb materials.
+ * Ink pass: the board is drawn in the same hand as Fig 5.
  *
- * glTF carries base colour, metalness and roughness and stops there, so every
- * surface arrives as the same dry plastic-or-metal lobe. What separates brass
- * from anodised aluminium from PBT is the second lobe — clearcoat, sheen,
- * transmission — and that is a handful of numbers per material, not geometry.
- * Cheaper than any amount of extra mesh detail and it survives a model rebuild,
- * because the lookup is by material name.
+ * The Anatomy plate is an iso drawing — near-black fills, hairline edges, one
+ * colour that means something. A photoreal board above it read as a different
+ * product. So every material collapses to a matte fill one step off the page,
+ * and `inkEdges` traces the creases. Colour is kept only where it carries
+ * information: the Esc outline, and the three hero switches' stems.
  *
- * ponytail: no textures anywhere. Real caps have a fine mould grain that a
- * noise roughnessMap would sell; add one when the board is shot in close-up.
+ * The lookup is by material name, so it survives a model rebuild.
  */
 
-type Tweak = THREE.MeshPhysicalMaterialParameters;
+type Ink = { color: number; opacity?: number };
 
-const SHADING: Record<string, Tweak> = {
-  // anodised aluminium: metal underneath, a thin matte skin on top
-  KB_Mat_Case: { metalness: 0.86, roughness: 0.36, clearcoat: 0.18, clearcoatRoughness: 0.55 },
-
-  // PBT. The sheen lobe is the powdery edge you get on moulded keycaps — it is
-  // what stops them reading as painted resin.
-  // sheen stays low: on a light cap it is a rim, and anything above ~0.15
-  // lifts the whole face and the alphas go to paper white
-  KB_Mat_Cap_Alpha: { roughness: 0.66, clearcoat: 0.16, clearcoatRoughness: 0.62, sheen: 0.14 },
-  KB_Mat_Cap_Mod: { roughness: 0.68, clearcoat: 0.14, clearcoatRoughness: 0.65, sheen: 0.13 },
-  KB_Mat_Cap_Esc: { roughness: 0.58, clearcoat: 0.22, clearcoatRoughness: 0.5, sheen: 0.12 },
-
-  // nylon housing, POM stem — the stem is the slick one, and the one the
-  // blue/red/brown swap recolours
-  KB_Mat_SwitchLower: { roughness: 0.55, clearcoat: 0.1 },
-  KB_Mat_Stem: { roughness: 0.32, clearcoat: 0.28, clearcoatRoughness: 0.3 },
-
-  // polycarbonate top. Real transmission, so the stem colour actually shows
-  // through the housing instead of being a lighter shade of grey.
-  // ponytail: transmission costs one extra scene render per frame. It is on one
-  // merged mesh and desktop-only; drop to `opacity` if the frame budget bites.
-  KB_Mat_SwitchUpper: IS_MOBILE
-    ? { roughness: 0.16, transparent: true, opacity: 0.86 }
-    : { roughness: 0.14, transmission: 0.62, thickness: 0.5, ior: 1.52 },
-
-  KB_Mat_Plate: { metalness: 1, roughness: 0.26, envMapIntensity: 1.35 },
-  // solder mask is matte with a faint gloss, not the wet-look slab a high
-  // clearcoat turns it into against a bright environment
-  KB_Mat_PCB: {
-    metalness: 0.08,
-    roughness: 0.58,
-    clearcoat: 0.12,
-    clearcoatRoughness: 0.6,
-    envMapIntensity: 0.7,
-  },
-  KB_Mat_Port: { metalness: 0.7, roughness: 0.5 },
+// Top-face tones. FACES below derives the two side faces from each, the way
+// the iso kit pairs --anatomy-lit-top with its --anatomy-shade-* steps.
+const INK: Record<string, Ink> = {
+  KB_Mat_Case: { color: 0x262626 },
+  KB_Mat_Cap_Alpha: { color: 0x303030 },
+  KB_Mat_Cap_Mod: { color: 0x2a2a2a },
+  KB_Mat_Cap_Esc: { color: 0x303030 },
+  KB_Mat_SwitchLower: { color: 0x222222 },
+  // smoked housing: the stem colour has to show through it
+  KB_Mat_SwitchUpper: { color: 0x2a2a2a, opacity: 0.45 },
+  KB_Mat_Plate: { color: 0x202020 },
+  KB_Mat_PCB: { color: 0x1c1c1c },
+  KB_Mat_Port: { color: 0x1c1c1c },
+  // grey on the board: 84 coloured stems were noise. Colour lives on the three
+  // hero switches only, which clone this and set their own.
+  KB_Mat_Stem: { color: 0x303030 },
 };
 
 /**
- * Swap every named material for a MeshPhysicalMaterial carrying its tweaks.
+ * A matcap of three flat faces: up-facing = full tone, left = 72%, right = 52%.
+ * An iso drawing's faces are filled, not lit — so no lights, no falloff, the
+ * same three values whatever the scene does. Fig 5 is built the same way.
+ */
+const FACES = (() => {
+  const n = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = n;
+  const g = c.getContext('2d')!;
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const nx = (x + 0.5) / n - 0.5;
+      const ny = 0.5 - (y + 0.5) / n; // matcap v runs up
+      const v = ny > 0.18 ? 255 : nx < 0 ? 184 : 133;
+      g.fillStyle = `rgb(${v},${v},${v})`;
+      g.fillRect(x, y, 1, 1);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  return t;
+})();
+
+/**
+ * Swap every named material for a flat three-face matcap.
  *
  * Run this BEFORE mergeSwitches — the merge buckets geometry by material
  * identity, so swapping after would leave the merged meshes pointing at the
@@ -70,19 +72,24 @@ export function shadeModel(root: THREE.Object3D): { shaded: number; unknown: str
     const hit = swapped.get(src);
     if (hit) return hit;
 
-    const tweak = SHADING[src.name];
-    if (!tweak) {
+    const ink = INK[src.name];
+    if (!ink) {
       if (src.name) unknown.push(src.name);
       swapped.set(src, src);
       return src;
     }
 
-    const std = src as THREE.MeshStandardMaterial;
-    const next = new THREE.MeshPhysicalMaterial({
-      color: std.color?.clone(),
-      metalness: std.metalness ?? 0,
-      roughness: std.roughness ?? 0.5,
-      ...tweak,
+    const next = new THREE.MeshMatcapMaterial({
+      color: ink.color,
+      matcap: FACES,
+      transparent: ink.opacity !== undefined,
+      opacity: ink.opacity ?? 1,
+      depthWrite: ink.opacity === undefined,
+      // push fills back a hair so the ink lines win the depth test — without
+      // it, a line lying on its own face z-fights into a dashed stutter
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
     });
     next.name = src.name;
     swapped.set(src, next);
@@ -99,6 +106,38 @@ export function shadeModel(root: THREE.Object3D): { shaded: number; unknown: str
   });
 
   return { shaded: swapped.size, unknown: [...new Set(unknown)] };
+}
+
+// --anatomy-mid lifted a step: on a moving 3D board the plate's 0.6px #6a6a6a
+// line drops out entirely, it needs the extra contrast to hold.
+const LINE = new THREE.LineBasicMaterial({ color: 0x8a8a8a, transparent: true, opacity: 0.8 });
+const LINE_ACCENT = new THREE.LineBasicMaterial({ color: 0xe8500f, transparent: true });
+LINE.name = 'KB_Ink_Line';
+LINE_ACCENT.name = 'KB_Ink_Accent';
+
+/**
+ * Trace every mesh's creases as a child LineSegments, so the lines ride along
+ * with the explode and the per-key press for free.
+ *
+ * ponytail: one extra draw call per mesh (~100 with per-key caps). Merge caps'
+ * edges per row if the frame budget ever bites; press then needs a vertex range.
+ */
+export function inkEdges(root: THREE.Object3D, angle = 25): number {
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
+  });
+  for (const mesh of meshes) {
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const accent = mats.some((m) => m.name === 'KB_Mat_Cap_Esc');
+    const line = new THREE.LineSegments(
+      new THREE.EdgesGeometry(mesh.geometry, angle),
+      accent ? LINE_ACCENT : LINE,
+    );
+    line.name = `${mesh.name}_ink`;
+    mesh.add(line);
+  }
+  return meshes.length;
 }
 
 /** Find one material by its Blender name — the swap and the callouts need it. */

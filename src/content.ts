@@ -9,6 +9,8 @@ export interface LayerCopy {
   anchor?: string;
   /** Callout anchors this section lights up. Keys of CALLOUTS. */
   parts?: string[];
+  /** The Fig 1 layer this section brings forward. */
+  layer: 'case' | 'pcb' | 'plate' | 'switches' | 'caps';
 }
 
 export const LAYERS: LayerCopy[] = [
@@ -18,24 +20,28 @@ export const LAYERS: LayerCopy[] = [
     body: 'Six sculpted rows, each at its own angle. One orange key, and it is the one you reach for when something has gone wrong.',
     anchor: 'layers',
     parts: ['KB_Keycaps_Row0'],
+    layer: 'caps',
   },
   {
     idx: 'LAYER 05',
     title: 'Switches',
-    body: 'Eighty-four of them under a translucent housing — one mesh, instanced eighty-four times, so the GPU barely notices.',
+    body: 'Eighty-four of them, one under every cap. The stem is the only part that differs between a blue, a red and a brown.',
     parts: ['KB_Switches_Group'],
+    layer: 'switches',
   },
   {
     idx: 'LAYER 04',
     title: 'Plate',
-    body: 'Brass, 1.5 mm, cut with eighty-four 14 mm windows. The part nobody sees and everybody hears.',
+    body: '1.5 mm, cut with eighty-four 14 mm windows. The part nobody sees and everybody hears.',
     parts: ['KB_Plate'],
+    layer: 'plate',
   },
   {
     idx: 'LAYER 03',
     title: 'PCB',
     body: 'Hot-swap everywhere. Pull a switch, drop in another, keep the board.',
     parts: ['KB_PCB'],
+    layer: 'pcb',
   },
   {
     idx: 'LAYER 01 — 02',
@@ -43,6 +49,7 @@ export const LAYERS: LayerCopy[] = [
     body: '313 × 123 mm of dark aluminium, walls high enough that only the keycap tops show. Flip-out feet set a 6° typing angle.',
     anchor: 'specs',
     parts: ['KB_Case_Bottom', 'KB_Feet'],
+    layer: 'case',
   },
 ];
 

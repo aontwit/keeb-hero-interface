@@ -7,7 +7,7 @@ import { createInteractions } from './interactions';
 import { createDebug } from './debug';
 import { mergeSwitches, pruneShadowCasters, switchTemplate } from './optimise';
 import { createHeroSwitches } from './heroSwitches';
-import { shadeModel } from './materials';
+import { inkEdges, shadeModel } from './materials';
 import { createSwitchSwap } from './switches';
 import { createCallouts } from './callouts';
 import type { SwitchSwap } from './switches';
@@ -50,9 +50,8 @@ declare global {
   }
 }
 
-/** Full-motion defaults. Reduced motion swaps both to their "off" value. */
+/** Full-motion default. Reduced motion swaps it to its "off" value. */
 const SCROLL_SMOOTHING = 0.14;
-const SCROLL_ORBIT = 1.15;
 
 export interface StartOptions {
   canvas: HTMLCanvasElement;
@@ -97,6 +96,9 @@ export async function startEngine({
   const template = switchGroup ? switchTemplate(switchGroup) : null; // before the merge eats them
   const merged = switchGroup ? mergeSwitches(switchGroup) : { before: 0, after: 0 };
   const { casters } = pruneShadowCasters(root);
+  // after the merge, so the 84 switches cost one line set, not 252
+  inkEdges(root);
+  if (template) inkEdges(template);
 
   // rig carries idle sway + pointer parallax so it never touches part transforms
   const rig = new THREE.Group();
@@ -121,7 +123,7 @@ export async function startEngine({
   const callouts = createCallouts(camera, { ...parts, ...heroes.nodes }, signal, (keys) =>
     heroes.show(keys.some((k) => k.startsWith('HERO_'))),
   );
-  const switches = createSwitchSwap(root, interactions, (spec) => {
+  const switches = createSwitchSwap(interactions, (spec) => {
     callouts.setNote('KB_Switches_Group', `84 · ${spec.feel.toLowerCase()}`);
     heroes.select(spec.id);
   });
@@ -130,8 +132,10 @@ export async function startEngine({
     yaw: -0.42,
     pitch: 0.46,
     distance: fit.dist,
-    scrollOrbit: SCROLL_ORBIT,
-    lateral: IS_MOBILE ? 0 : -11,
+    // Fig 1 is a drawing, and a drawing holds still: no sweep, no pan — the
+    // canvas already sits in its own column beside the copy
+    scrollOrbit: 0,
+    lateral: 0,
   };
 
   const debug = createDebug(
@@ -146,10 +150,7 @@ export async function startEngine({
   // it is 1:1 with the scroll position — direct manipulation, not autoplay.
   const applyMotionPreference = (reduced: boolean) => {
     interactions.cfg.reduced = reduced;
-    interactions.cfg.idle = !reduced;
-    interactions.cfg.parallax = !reduced && !IS_MOBILE;
     scroll.cfg.smoothing = reduced ? 1 : SCROLL_SMOOTHING; // 1 = no lerp tail
-    orbit.scrollOrbit = reduced ? 0 : SCROLL_ORBIT;
   };
   applyMotionPreference(motionQuery.matches);
   motionQuery.addEventListener('change', (e) => applyMotionPreference(e.matches), { signal });
@@ -235,7 +236,7 @@ export async function startEngine({
       scene.remove(rig);
       root.traverse((o) => {
         const mesh = o as THREE.Mesh;
-        if (!mesh.isMesh) return;
+        if (!mesh.isMesh && !(o as THREE.LineSegments).isLine) return;
         mesh.geometry.dispose();
         for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           m.dispose();

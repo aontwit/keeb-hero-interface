@@ -51,7 +51,7 @@ export function createInteractions(
   { enableParallax = !IS_MOBILE }: { enableParallax?: boolean } = {},
 ): Interactions {
   const cfg: InteractionConfig = {
-    parallax: enableParallax,
+    parallax: false, // Fig 1 holds still
     tiltX: 0.075,
     tiltY: 0.13,
     damping: 0.075,
@@ -65,7 +65,7 @@ export function createInteractions(
     idleRate: 1.2,
     floatAmp: 0.17,
     floatSpeed: 0.5,
-    idle: true,
+    idle: false,
     reduced: false, // engine sets this from the media query, and on change
     pressEase: 'outElastic(1, .55)',
     pressDrop: 0.34,
@@ -129,7 +129,9 @@ export function createInteractions(
     (e: PointerEvent) => {
       // A miss presses nothing: clicking the copy or the background should not
       // fire a key somewhere off screen.
-      ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+      const el = e.target as HTMLElement;
+      if (el.tagName !== 'CANVAS') return;
+      ndc.set((e.offsetX / el.clientWidth) * 2 - 1, -(e.offsetY / el.clientHeight) * 2 + 1);
       ray.setFromCamera(ndc, camera);
       const hit = ray.intersectObjects(meshes, false)[0];
       const k = hit && byNode.get(hit.object);

@@ -2,9 +2,15 @@
 
 :root {
   color-scheme: dark;
+  /* the page is two columns, like Fig 5: copy on the left, the plate on the right.
+     The board never sits under a line of text. */
+  --col: clamp(20rem, 38vw, 34rem);
+  --plate-top: 4.6rem;
+  --plate-gap: clamp(0.8rem, 2.4vw, 2rem);
   --p: 0;
-  --ink: #edeae3;
-  --dim: #7c8290;
+  --ink: #e6e6e6; /* --anatomy-strong */
+  --dim: #8c8c8c; /* between --anatomy-text and --anatomy-muted */
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --hot: #e8500f;
   --serif: 'Instrument Serif', 'Times New Roman', serif;
 }
@@ -22,14 +28,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-canvas#app {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 0;
-}
-
 /* ── nav ─────────────────────────────────────────────── */
 nav {
   position: fixed;
@@ -38,14 +36,17 @@ nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.6rem clamp(1.2rem, 4vw, 3rem);
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  mix-blend-mode: difference;
+  height: var(--plate-top); /* meets the plate edge, so no copy shows in a gap */
+  padding: 0 clamp(1.2rem, 4vw, 3rem);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  /* solid, not blended: copy scrolls up behind the nav and must not show through */
+  background: #0d0f14;
 }
 nav .mark {
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.14em;
 }
 nav ul {
   display: flex;
@@ -79,27 +80,83 @@ section {
   padding: 0 clamp(1.2rem, 6vw, 5rem);
 }
 .hero h1 {
-  font: 400 clamp(3.6rem, 9vw, 8rem) / 0.9 var(--serif);
+  font: 400 clamp(3.2rem, 6.2vw, 7rem) / 0.9 var(--serif); /* fits the copy column */
   letter-spacing: -0.02em;
 }
-/* keep the copy in the left column — the board is panned into the right */
-.hero > * {
-  max-width: min(46vw, 34rem);
+.hero,
+.layer,
+.picker {
+  max-width: var(--col);
 }
 @media (max-width: 900px) {
-  .hero > * {
-    max-width: 100%;
+  .hero,
+  .layer,
+  .picker {
+    max-width: none;
+    /* copy starts under the plate, never behind it */
+    align-content: start;
+    padding-top: calc(var(--plate-top) + 46vh + 1.5rem);
   }
 }
 .hero h1 em {
   font-style: italic;
-  color: var(--hot);
+  color: var(--anatomy-muted);
+}
+.hero .no,
+.layer .idx,
+.picker .idx {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--anatomy-muted);
+}
+.hero .no {
+  margin-bottom: 1rem;
 }
 .hero .sub {
   margin-top: 1.6rem;
   max-width: 30ch;
   color: var(--dim);
   font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+}
+.hero-stems {
+  margin-top: 1.6rem;
+  display: flex;
+  gap: 0.4rem;
+  pointer-events: auto; /* main is pointer-events:none */
+}
+.hero-stems button {
+  padding: 0.5rem 0.8rem;
+  border: 0;
+  background: var(--anatomy-card);
+  box-shadow: 0 0 0 1px var(--anatomy-faint);
+  color: var(--anatomy-text);
+  font: 400 11px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: box-shadow 0.2s var(--anatomy-ease), color 0.2s;
+}
+.hero-stems button::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 0.5rem;
+  vertical-align: 0.1em;
+  background: var(--c);
+}
+.hero-stems button:hover {
+  box-shadow: 0 0 0 1px var(--anatomy-mid);
+}
+.hero-stems button[aria-checked='true'] {
+  box-shadow: 0 0 0 1px var(--anatomy-hi);
+  color: var(--anatomy-strong);
+}
+.hero-stems button:focus-visible {
+  outline: 1px solid var(--anatomy-lit);
+  outline-offset: 2px;
 }
 .hero .meta {
   margin-top: 2.2rem;
@@ -112,7 +169,7 @@ section {
   color: var(--dim);
 }
 .hero .meta {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.1em;
 }
@@ -125,20 +182,6 @@ section {
   text-transform: none;
 }
 
-.layer {
-  max-width: 32rem;
-}
-.layer:nth-of-type(even) {
-  margin-left: auto;
-  text-align: right;
-}
-.layer .idx,
-.picker .idx {
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: var(--hot);
-}
 .layer h2,
 .picker h2 {
   margin-top: 0.4rem;
@@ -150,72 +193,12 @@ section {
   color: var(--dim);
   max-width: 34ch;
 }
-.layer:nth-of-type(even) p {
-  margin-left: auto;
-}
 
 /* ── switch picker ───────────────────────────────────── */
-.picker {
-  max-width: 34rem;
-}
-.swatches {
-  display: flex;
-  gap: 0.6rem;
+.picker .an-stems {
   margin-top: 1.4rem;
-  pointer-events: auto; /* main is pointer-events:none so the canvas stays draggable */
-}
-.swatches button {
-  flex: 1;
-  display: grid;
-  gap: 0.15rem;
-  justify-items: start;
-  padding: 0.85rem 1rem;
-  border: 1px solid #ffffff1f;
-  border-radius: 10px;
-  background: #ffffff08;
-  color: var(--dim);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  transition:
-    border-color 0.22s,
-    background 0.22s,
-    color 0.22s;
-}
-@media (max-width: 640px) {
-  .swatches {
-    flex-direction: column; /* three side by side clip their own labels here */
-  }
-  .swatches i {
-    max-width: 4rem;
-  }
-}
-.swatches button:hover {
-  border-color: #ffffff3d;
-  color: var(--ink);
-}
-.swatches button[aria-pressed='true'] {
-  border-color: #ffffff5c;
-  background: #ffffff14;
-  color: var(--ink);
-}
-.swatches button:focus-visible {
-  outline: 2px solid var(--hot);
-  outline-offset: 2px;
-}
-.swatches i {
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  margin-bottom: 0.45rem;
-}
-.swatches b {
-  font: 400 1.35rem/1 var(--serif);
-}
-.swatches span {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  max-width: 22rem;
+  pointer-events: auto; /* main is pointer-events:none */
 }
 .picker p {
   margin-top: 1.2rem;
@@ -230,73 +213,15 @@ section {
   font-size: 12px;
 }
 .picker dt {
-  letter-spacing: 0.14em;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--dim);
 }
 .picker dd {
   margin: 0.25rem 0 0;
   font: 400 1.5rem/1 var(--serif);
-}
-
-/* ── leader lines ────────────────────────────────────── */
-.callouts {
-  position: fixed;
-  inset: 0;
-  /* under `main` (2), over the canvas (0): a leader line that crosses the
-     headline passes behind the glyphs, the way it would on a printed diagram */
-  z-index: 1;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  overflow: visible;
-}
-.callouts .co {
-  visibility: hidden;
-  /* the line and the label both cross white keycaps at some scroll position —
-     one shadow on the group keeps both legible without a plate behind them */
-  filter: drop-shadow(0 1px 2px rgb(13 15 20 / 0.95));
-}
-.callouts .lead {
-  fill: none;
-  stroke: var(--ink);
-  stroke-width: 1;
-  opacity: 0.75;
-  stroke-dasharray: 1; /* pathLength=1 on the element, so one rule fits any length */
-  stroke-dashoffset: 1;
-}
-.callouts .dot {
-  fill: var(--hot);
-  opacity: 0;
-  transform-box: fill-box; /* or `scale` would pivot on the SVG origin, not the dot */
-  transform-origin: center;
-}
-.callouts .lbl {
-  opacity: 0;
-}
-/* halo, so a label that lands on the brass plate is still a label */
-.callouts text {
-  paint-order: stroke;
-  stroke: #0d0f14;
-  stroke-width: 4px;
-  stroke-linejoin: round;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-  text-transform: lowercase;
-}
-.callouts .t {
-  fill: var(--ink);
-  font-size: 13px;
-  letter-spacing: 0.02em;
-}
-.callouts .n {
-  fill: #7f8797;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-@media (max-width: 899px) {
-  .callouts {
-    display: none;
-  }
 }
 
 /* ── progress + hint ─────────────────────────────────── */
@@ -311,32 +236,110 @@ section {
   transform: scaleX(var(--p));
   background: var(--hot);
 }
-.hint {
+/* ── Fig 1 plate ─────────────────────────────────────
+   The canvas framed the way Fig 5 frames its drawing: a hairline box and four
+   mono corners. Fixed, under the copy; the opaque Anatomy section slides over it. */
+.plate {
   position: fixed;
-  left: 50%;
-  bottom: 1.6rem;
-  z-index: 4;
-  translate: -50% 0;
-  font-size: 11px;
-  letter-spacing: 0.2em;
+  top: var(--plate-top);
+  right: var(--plate-gap);
+  bottom: var(--plate-gap);
+  width: calc(100vw - var(--col) - var(--plate-gap) * 2);
+  z-index: 1;
+  pointer-events: none;
+  background: var(--anatomy-card);
+  box-shadow: 0 0 0 1px var(--anatomy-mid); /* Fig 5's plate edge */
+}
+.kb-stage {
+  position: absolute;
+  inset: 34px 20px;
+  pointer-events: auto;
+  outline: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kb-stage:focus-visible {
+  box-shadow: 0 0 0 1px var(--anatomy-hi);
+}
+.kb-stage .iso-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%; /* viewBox + default meet: the drawing fits whatever the plate's shape */
+}
+/* a key going down: CSS transition on the transform the press writes */
+.kb-cap {
+  transition: transform 70ms var(--anatomy-ease);
+}
+.kb-cap[data-down] {
+  --anatomy-hi: var(--anatomy-lit);
+}
+.kb-svg .kb-stem {
+  --anatomy-lit: var(--kb-stem);
+}
+.kb-svg .kb-esc {
+  --anatomy-lit: var(--hot);
+}
+/* every layer but the one being read drops back a tone, the way Fig 5 tones
+   down what it is not about */
+.kb-svg [data-layer] {
+  transition: opacity 0.3s;
+}
+.kb-svg [data-dim] {
+  --anatomy-hi: var(--anatomy-lo);
+  --anatomy-mid: var(--anatomy-faint);
+  --anatomy-lo: var(--anatomy-faint);
+}
+.kb-svg [data-dim] .kb-stem,
+.kb-svg [data-dim] .kb-esc {
+  --anatomy-lit: var(--anatomy-lo);
+}
+.plate span {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--anatomy-muted);
+}
+.plate [data-corner='fig'] {
+  top: 14px;
+  left: 16px;
+  color: var(--anatomy-text);
+}
+.plate [data-corner='title'],
+.plate [data-corner='hint'] {
   text-transform: uppercase;
-  color: var(--dim);
+  letter-spacing: 0.1em;
+}
+.plate [data-corner='title'] {
+  top: 14px;
+  right: 16px;
+}
+.plate [data-corner='hint'] {
+  bottom: 14px;
+  left: 16px;
   opacity: calc(1 - var(--p) * 6);
 }
-.boot {
-  position: fixed;
-  inset: 0;
-  z-index: 9;
-  display: grid;
-  place-content: center;
-  background: #0d0f14;
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--dim);
+.plate [data-corner='readout'] {
+  bottom: 14px;
+  right: 16px;
+  color: var(--anatomy-text);
 }
-.boot[data-error] {
-  color: var(--hot);
+@media (max-width: 900px) {
+  .plate {
+    left: var(--plate-gap);
+    width: auto;
+    bottom: auto;
+    height: 46vh;
+    z-index: 3; /* over the copy: text scrolls under the figure, never across it */
+  }
+  .plate [data-corner='title'] {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .bar {

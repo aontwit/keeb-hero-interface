@@ -32,7 +32,7 @@ const el = <K extends keyof SVGElementTagNameMap>(tag: K, cls?: string) => {
 const MARGIN = 44; // frame edge -> outer edge of the text
 const LABEL_W = 138; // reserved for the text block, so the line always stops clear of it
 const STUB = 64; // horizontal run between the diagonal and the label
-const SLOT_TOP = 76; // first slot: under the nav, above every section's copy
+const SLOT_TOP = 132; // first slot: under the Fig 1 plate corner, above every section's copy
 const SLOT_H = 44;
 
 interface Line {
