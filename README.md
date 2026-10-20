@@ -30,6 +30,8 @@ Press **D** for the lil-gui art-direction panel.
 
 ## Fig 5 — the keyswitch figure
 
+![Fig 5](docs/fig5-keyswitch.png)
+
 Below the scroll story sits an interactive isometric figure: one switch on a
 force bench, top housing cut away. Hold it down and the stem travels 4 mm, the
 spring compresses, the leaf contacts close at the actuation point, the PCB trace
