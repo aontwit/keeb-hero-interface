@@ -154,19 +154,55 @@ function caps() {
     .join('');
 }
 
-// the frame is four bars, split by which side of the board faces the viewer:
-// the back two draw under the caps, the front two over them
-const BARS: Plan[] = [
-  { x: CASE.x, y: CASE.y, w: CASE.w, d: RIM, r: 3 },
-  { x: CASE.x, y: CASE.y + CASE.d - RIM, w: CASE.w, d: RIM, r: 3 },
-  { x: CASE.x, y: CASE.y + RIM - 0.5, w: RIM, d: CASE.d - RIM * 2 + 1, r: 0.6 },
-  { x: CASE.x + CASE.w - RIM, y: CASE.y + RIM - 0.5, w: RIM, d: CASE.d - RIM * 2 + 1, r: 0.6 },
+// The frame is ONE rounded slab — same plan and radius as the tub, so the four
+// corners close cleanly — with the key opening cut out by clip paths, drawn
+// twice. Painter's order needs it split: the far strips (back, left) sit under
+// the caps, the near strips (front, right) over them.
+const FRAME_TOP = FRAME_Z + FRAME_H;
+const OPEN: Plan = { x: CASE.x + RIM, y: CASE.y + RIM, w: CASE.w - RIM * 2, d: CASE.d - RIM * 2, r: 2 };
+const frameSlab = () => S(slab(CASE, FRAME_Z, FRAME_H, 0.8, 8), { tone: 'mid' });
+const flat = (pts: [number, number][], z: number) => k.pathOf(pts.map(([x, y]) => at([x, y, z])), true);
+
+// everything but the opening, as seen at the frame's top face
+const HOLE_CLIP = `<clipPath id="kb-frame-hole" clipPathUnits="userSpaceOnUse"><path clip-rule="evenodd" d="M-9999 -9999H9999V9999H-9999Z${k.planOutline(OPEN, FRAME_TOP, P, 4)}"/></clipPath>`;
+
+// the near L (front + right strips) swept from the frame's foot to its top:
+// top face, foot, and one quad per edge — clip children union
+const NEAR: [number, number][] = [
+  [CASE.x - 2, OPEN.y + OPEN.d],
+  [OPEN.x + OPEN.w, OPEN.y + OPEN.d],
+  [OPEN.x + OPEN.w, CASE.y - 2],
+  [CASE.x + CASE.w + 2, CASE.y - 2],
+  [CASE.x + CASE.w + 2, CASE.y + CASE.d + 2],
+  [CASE.x - 2, CASE.y + CASE.d + 2],
 ];
-const facing = (p: Plan) => k.depthOf([p.x + p.w / 2, p.y + p.d / 2, 0], P) > 0;
-const bars = (front: boolean) =>
-  BARS.filter((p) => facing(p) === front)
-    .map((p) => S(slab(p, FRAME_Z, FRAME_H, 0.8, 4), { tone: 'mid' }))
-    .join('');
+const NEAR_CLIP = (() => {
+  const lo = FRAME_Z - 1;
+  const hi = FRAME_TOP + 1;
+  const paths = [flat(NEAR, hi), flat(NEAR, lo)];
+  NEAR.forEach(([x0, y0], i) => {
+    const [x1, y1] = NEAR[(i + 1) % NEAR.length];
+    paths.push(k.pathOf([at([x0, y0, hi]), at([x1, y1, hi]), at([x1, y1, lo]), at([x0, y0, lo])], true));
+  });
+  return `<clipPath id="kb-frame-near" clipPathUnits="userSpaceOnUse">${paths.map((d) => `<path d="${d}"/>`).join('')}</clipPath>`;
+})();
+
+function frameBack() {
+  const { x, y, w, d } = OPEN;
+  // the two inner walls that face the viewer: back strip's, left strip's
+  const back = k.pathOf([at([x, y, FRAME_TOP]), at([x + w, y, FRAME_TOP]), at([x + w, y, FRAME_Z]), at([x, y, FRAME_Z])], true);
+  const left = k.pathOf([at([x, y, FRAME_TOP]), at([x, y + d, FRAME_TOP]), at([x, y + d, FRAME_Z]), at([x, y, FRAME_Z])], true);
+  return [
+    `<g clip-path="url(#kb-frame-hole)">${frameSlab()}</g>`,
+    `<path class="iso-shade" data-shade="1" d="${back}"/>`,
+    `<path class="iso-shade" data-shade="2" d="${left}"/>`,
+    L(k.segment([x, y, FRAME_Z], [x + w, y, FRAME_Z], P) + k.segment([x, y, FRAME_Z], [x, y + d, FRAME_Z], P) + k.rise([x, y], FRAME_Z, FRAME_TOP, P), { tone: 'faint' }),
+    L(k.planOutline(OPEN, FRAME_TOP, P, 4), { tone: 'mid' }),
+  ].join('');
+}
+
+const frameFront = () =>
+  `<g clip-path="url(#kb-frame-near)">${frameSlab()}${L(k.planOutline(OPEN, FRAME_TOP, P, 4), { tone: 'mid' })}</g>`;
 
 const layer = (id: LayerId, body: string, part?: string) =>
   `<g data-layer="${id}"${part ? ` data-part="${part}"` : ''}>${body}</g>`;
@@ -178,15 +214,16 @@ export const SVG = k.figureSvg({
   label:
     'A 75 percent keyboard drawn in isometric: case, PCB, plate, eighty-four switches, keycaps and frame, stacked in six layers that separate as you scroll.',
   body: [
+    `<defs>${HOLE_CLIP}${NEAR_CLIP}</defs>`,
     `<g data-part="root">`,
     `<path class="iso-halo" d="${k.haloOf(CASE, 0, TUB_H, P)}"/>`,
     layer('case', tub()),
     layer('pcb', pcb()),
     layer('plate', plate()),
     layer('switches', switches()),
-    layer('frame', bars(false), 'frame-back'),
+    layer('frame', frameBack(), 'frame-back'),
     layer('caps', caps()),
-    layer('frame', bars(true), 'frame-front'),
+    layer('frame', frameFront(), 'frame-front'),
     `</g>`,
   ],
 });
